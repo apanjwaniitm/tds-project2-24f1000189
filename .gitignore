@@ -1,0 +1,6 @@
+__pycache__/
+.env
+AIPROXY_TOKEN
+*.log
+*.sqlite3
+.DS_Store

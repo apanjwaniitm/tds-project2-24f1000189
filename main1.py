@@ -1,0 +1,87 @@
+from fastapi import FastAPI, Form, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel  
+import os
+import httpx
+import fitz  # PyMuPDF for PDF text extraction
+from typing import Optional
+
+AIPROXY_TOKEN = os.getenv("AIPROXY_TOKEN")
+
+if not AIPROXY_TOKEN:
+    raise ValueError("AIPROXY_TOKEN is not set! Run 'export AIPROXY_TOKEN=your-token' before starting FastAPI.")
+
+AIPROXY_BASE_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class AnswerResponse(BaseModel):
+    answer: str
+
+def extract_text_from_pdf(pdf_bytes: bytes) -> str:
+    """Extracts text from a PDF file given as bytes."""
+    pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    extracted_text = "\n".join(page.get_text("text") for page in pdf_document)
+    return extracted_text[:2000]  # Limit context to first 2000 characters
+
+def get_llm_answer(question: str, context: str = "") -> str:
+    """Queries GPT-4o-mini through AIPROXY using httpx with optional PDF context."""
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {AIPROXY_TOKEN}"
+    }
+
+    prompt = question if not context else f"Context: {context}\nQuestion: {question}"
+    
+    payload = {
+        "model": "gpt-4o-mini",
+        "temperature": 0.0,
+        "messages": [
+            {"role": "system", "content": "You are answering graded assignments. Use provided context strictly. Do not assume missing data. Return only the final answer, no explanations."},
+            {"role": "user", "content": prompt}
+        ],
+    }
+    
+    try:
+        response = httpx.post(AIPROXY_BASE_URL, json=payload, headers=headers, timeout=60.0)
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        elif response.status_code == 429:
+            return "AIPROXY monthly request limit reached. Try again next month!"
+        elif response.status_code == 403:
+            return "AIPROXY cost limit exceeded ($0.5). Requests are blocked!"
+        else:
+            return f"AIPROXY Error {response.status_code}: {response.text}"
+    
+    except httpx.TimeoutException:
+        return "AIPROXY request timed out. Try again later or simplify your question."
+    except httpx.RequestError as e:
+        return f"Failed to connect to AIPROXY: {str(e)}"
+
+@app.post("/api/", response_model=AnswerResponse)
+async def solve_question(
+    question: str = Form(...),
+    file: Optional[UploadFile] = File(None)
+):
+    """API endpoint to answer graded assignment questions with optional PDF context."""
+    context = ""
+    
+    if file and file.filename.endswith(".pdf"):
+        pdf_content = await file.read()
+        context = extract_text_from_pdf(pdf_content)
+        print(f"Extracted text from {file.filename}: {context[:500]}...")
+    
+    answer = get_llm_answer(question, context)
+    return AnswerResponse(answer=answer)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5000, reload=True)
