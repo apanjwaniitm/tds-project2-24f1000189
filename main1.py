@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel  
 import os
 import httpx
-import fitz  # PyMuPDF for PDF text extraction
 from typing import Optional
 
 AIPROXY_TOKEN = os.getenv("AIPROXY_TOKEN")
@@ -25,12 +24,6 @@ app.add_middleware(
 
 class AnswerResponse(BaseModel):
     answer: str
-
-def extract_text_from_pdf(pdf_bytes: bytes) -> str:
-    """Extracts text from a PDF file given as bytes."""
-    pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-    extracted_text = "\n".join(page.get_text("text") for page in pdf_document)
-    return extracted_text[:2000]  # Limit context to first 2000 characters
 
 def get_llm_answer(question: str, context: str = "") -> str:
     """Queries GPT-4o-mini through AIPROXY using httpx with optional PDF context."""
@@ -72,13 +65,6 @@ async def solve_question(
     file: Optional[UploadFile] = File(None)
 ):
     """API endpoint to answer graded assignment questions with optional PDF context."""
-    context = ""
-    
-    if file and file.filename.endswith(".pdf"):
-        pdf_content = await file.read()
-        context = extract_text_from_pdf(pdf_content)
-        print(f"Extracted text from {file.filename}: {context[:500]}...")
-    
     answer = get_llm_answer(question, context)
     return AnswerResponse(answer=answer)
 
