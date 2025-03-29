@@ -3,5 +3,5 @@ uvicorn
 pydantic
 python-multipart
 openai
-fitz
-PIL
+pillow
+pymupdf
