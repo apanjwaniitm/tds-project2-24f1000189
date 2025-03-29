@@ -45,7 +45,7 @@ def get_llm_answer(question: str, context: str = "") -> str:
         "model": "gpt-4o-mini",
         "temperature": 0.0,
         "messages": [
-            {"role": "system", "content": "You are answering graded assignments. Use provided context strictly. Do not assume missing data. Return only the final answer, no explanations."},
+            {"role": "system", "content": "You are a computational expert who outputs correct answers after interpreting and analysing the problem step by step. Use provided context strictly. Do not assume missing data. Return only the final answer, no explanations. Respond ONLY with the exact answer, no additional text, explanations or context. If the nswer is a number, only return the number. If the answer is a text, return only the precise text required."},
             {"role": "user", "content": prompt}
         ],
     }
