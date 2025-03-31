@@ -168,7 +168,7 @@ async def solve_question(
     question: str = Form(...),
     file: Optional[UploadFile] = File(None)
 ):
-    """API endpoint to answer questions with optional GitHub repo lookup."""
+    """API endpoint to answer graded assignment questions of Tools in Data Science (IITM BSSE2002)."""
     if "GitHub action" in question and "repository URL" in question:
         answer = get_github_repo_with_action()
     elif "Find the Vercel API URL" in question:
