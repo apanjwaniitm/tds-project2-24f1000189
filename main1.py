@@ -125,7 +125,7 @@ def get_marks(name: list[str] = Query(...)):
 
 def get_docker_hub_url():
     docker_username = os.getenv("DOCKER_HUB_USERNAME", "apanjwaniitm")  # Use env variable, fallback to hardcoded value
-    repo_name = "tds-project1-dataworks-automation"
+    repo_name = "tds-project1-24f1000189"
 
     return f"https://hub.docker.com/repository/docker/{docker_username}/{repo_name}/general"
 
