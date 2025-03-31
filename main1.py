@@ -58,6 +58,22 @@ def get_github_repo_with_action():
 
     return "No recent GitHub Actions found."
 
+def get_vercel_api():
+    """Deploys FastAPI app to Vercel and returns the deployed API URL."""
+    try:
+        # Run the Vercel deployment command
+        process = subprocess.run(["vercel", "--prod"], capture_output=True, text=True)
+        output = process.stdout
+
+        # Extract the deployed URL from Vercel CLI output
+        for line in output.split("\n"):
+            if "https://" in line and ".vercel.app" in line:
+                return line.strip()
+
+        return "Vercel deployment failed. Check logs."
+    except Exception as e:
+        return f"Error deploying to Vercel: {str(e)}"
+
 def get_llm_answer(question: str, context: str = "") -> str:
     """Queries GPT-4o-mini through AIPROXY using httpx with optional PDF context."""
     headers = {
@@ -100,6 +116,8 @@ async def solve_question(
     """API endpoint to answer questions with optional GitHub repo lookup."""
     if "GitHub action" in question and "repository URL" in question:
         answer = get_github_repo_with_action()
+    elif "Find the Vercel API URL" in question:
+        answer = get_vercel_api()
     else:
         answer = get_llm_answer(question)
     
