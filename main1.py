@@ -7,11 +7,16 @@ import httpx
 from typing import Optional
 
 AIPROXY_TOKEN = os.getenv("AIPROXY_TOKEN")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 if not AIPROXY_TOKEN:
     raise ValueError("AIPROXY_TOKEN is not set! Run 'export AIPROXY_TOKEN=your-token' before starting FastAPI.")
 
+if not GITHUB_TOKEN:
+    raise ValueError("GITHUB_TOKEN is not set! Run 'export GITHUB_TOKEN=your-github-token'.")
+
 AIPROXY_BASE_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
+GITHUB_API_URL = "https://api.github.com"
 
 app = FastAPI()
 
@@ -25,6 +30,33 @@ app.add_middleware(
 
 class AnswerResponse(BaseModel):
     answer: str
+
+def get_github_repo_with_action():
+    """Fetch the most recent repository where an action was triggered."""
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    
+    # Step 1: Get the authenticated user's repositories
+    user_resp = httpx.get(f"{GITHUB_API_URL}/user", headers=headers)
+    if user_resp.status_code != 200:
+        return "Error fetching user info."
+    
+    username = user_resp.json()["login"]
+    
+    repos_resp = httpx.get(f"{GITHUB_API_URL}/users/{username}/repos", headers=headers)
+    if repos_resp.status_code != 200:
+        return "Error fetching repositories."
+
+    repos = repos_resp.json()
+
+    # Step 2: Check each repo for recent GitHub Actions runs
+    for repo in repos:
+        repo_name = repo["name"]
+        actions_resp = httpx.get(f"{GITHUB_API_URL}/repos/{username}/{repo_name}/actions/runs", headers=headers)
+
+        if actions_resp.status_code == 200 and actions_resp.json()["total_count"] > 0:
+            return f"https://github.com/{username}/{repo_name}"
+
+    return "No recent GitHub Actions found."
 
 def get_llm_answer(question: str, context: str = "") -> str:
     """Queries GPT-4o-mini through AIPROXY using httpx with optional PDF context."""
