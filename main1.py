@@ -97,8 +97,12 @@ async def solve_question(
     question: str = Form(...),
     file: Optional[UploadFile] = File(None)
 ):
-    """API endpoint to answer graded assignment questions with optional PDF context."""
-    answer = get_llm_answer(question)
+    """API endpoint to answer questions with optional GitHub repo lookup."""
+    if "GitHub action" in question and "repository URL" in question:
+        answer = get_github_repo_with_action()
+    else:
+        answer = get_llm_answer(question)
+    
     return AnswerResponse(answer=answer)
 
 if __name__ == "__main__":
