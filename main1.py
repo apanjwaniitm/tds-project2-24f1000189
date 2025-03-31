@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import os
 import httpx
 from typing import Optional
+import subprocess
 
 AIPROXY_TOKEN = os.getenv("AIPROXY_TOKEN")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -58,11 +59,59 @@ def get_github_repo_with_action():
 
     return "No recent GitHub Actions found."
 
-def get_vercel_api():
-    """Deploys FastAPI app to Vercel and returns the deployed API URL."""
+def get_vercel_api_with_python_code():
+    """Generates and deploys a FastAPI app to Vercel and returns the API URL."""
     try:
-        # Run the Vercel deployment command
-        process = subprocess.run(["vercel", "--prod"], capture_output=True, text=True)
+        # Define the Python FastAPI code dynamically
+        api_code = """\
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+import json
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Load student marks data from a JSON file
+with open("q-vercel-python.json", "r") as f:
+    student_data = json.load(f)
+
+@app.get("/api")
+def get_marks(name: list[str] = Query(...)):
+    marks = [next((entry["marks"] for entry in student_data if entry["name"] == n), None) for n in name]
+    return {"marks": marks}
+        """
+
+        # Write the code to a `main.py` file inside a Vercel project directory
+        vercel_project_path = "vercel_project"
+        os.makedirs(vercel_project_path, exist_ok=True)
+        with open(os.path.join(vercel_project_path, "main.py"), "w") as f:
+            f.write(api_code)
+
+        # Also, copy the JSON file into the Vercel project directory
+        with open("q-vercel-python.json", "r") as f:
+            json_data = f.read()
+        with open(os.path.join(vercel_project_path, "q-vercel-python.json"), "w") as f:
+            f.write(json_data)
+
+        # Create a `vercel.json` file for configuration
+        vercel_config = """\
+{
+  "builds": [{ "src": "main.py", "use": "@vercel/python" }],
+  "routes": [{ "src": "/(.*)", "dest": "main.py" }]
+}
+        """
+        with open(os.path.join(vercel_project_path, "vercel.json"), "w") as f:
+            f.write(vercel_config)
+
+        # Deploy the project using Vercel CLI
+        process = subprocess.run(["vercel", "--prod"], cwd=vercel_project_path, capture_output=True, text=True)
         output = process.stdout
 
         # Extract the deployed URL from Vercel CLI output
@@ -117,7 +166,7 @@ async def solve_question(
     if "GitHub action" in question and "repository URL" in question:
         answer = get_github_repo_with_action()
     elif "Find the Vercel API URL" in question:
-        answer = get_vercel_api()
+        answer = get_vercel_api_with_python_code()
     else:
         answer = get_llm_answer(question)
     
