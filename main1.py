@@ -123,6 +123,12 @@ def get_marks(name: list[str] = Query(...)):
     except Exception as e:
         return f"Error deploying to Vercel: {str(e)}"
 
+def get_docker_hub_url():
+    docker_username = os.getenv("DOCKER_HUB_USERNAME", "apanjwaniitm")  # Use env variable, fallback to hardcoded value
+    repo_name = "tds-project1-dataworks-automation"
+
+    return f"https://hub.docker.com/repository/docker/{docker_username}/{repo_name}/general"
+
 def get_llm_answer(question: str, context: str = "") -> str:
     """Queries GPT-4o-mini through AIPROXY using httpx with optional PDF context."""
     headers = {
@@ -167,10 +173,13 @@ async def solve_question(
         answer = get_github_repo_with_action()
     elif "Find the Vercel API URL" in question:
         answer = get_vercel_api_with_python_code()
+    elif "Docker image URL" in question:
+        answer = get_docker_hub_url()
     else:
         answer = get_llm_answer(question)
     
     return AnswerResponse(answer=answer)
+
 
 if __name__ == "__main__":
     import uvicorn
